@@ -1,0 +1,7 @@
+<Chiron>
+        <database name="montages" server="52.174.49.98" port="5432" username="liu" password="4vzkvdy9"/>
+	<machine address="localhost" name="name" password="password" username="vitor" />
+	<Workflow execmodel="DYN_FAF" exectag="montage-1" expdir="%=WFDIR%/exp" tag="Montage1" wfdir="/home/lucliuji/workflow">
+			<Relation filename="ImProjectPP1.dataset" name="ImProjectPP" />
+	</Workflow>
+</Chiron>

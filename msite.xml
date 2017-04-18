@@ -1,0 +1,29 @@
+<multisite>
+	<site region="West Europe" id="0" publicIP="52.174.49.98" proBW="0.0027" CPU="24" role="master">
+		<database name="montages" server="52.174.49.98" port="5432" username="liu" password="4vzkvdy9"/>
+		<connection target="0" thisport="0" targetport="" databw="0" />
+		<connection target="1" thisport="8889" targetport="" databw="2048" />
+		<connection target="2" thisport="8890" targetport="" databw="1024" />
+		<VM id="0" privateip="10.0.0.4" CPU="8" type="A4" comcap="9.6" price="0.0683"/>
+		<VM id="1" privateip="10.0.0.5" CPU="8" type="A4" comcap="9.6" price="0.0683"/>
+		<VM id="2" privateip="10.0.0.6" CPU="8" type="A4" comcap="9.6" price="0.0683"/>
+	</site>
+	<site region="North Europe" id="1" publicIP="52.169.52.225" proBW="0.0253" CPU="24" role="slave">
+		<database name="montages" server="52.169.52.225" port="5432" username="liu" password="4vzkvdy9"/>
+		<connection target="0" thisport="8889" targetport="" databw="2048" />
+		<connection target="1" thisport="0" targetport="" databw="0" />
+		<connection target="2" thisport="8890" targetport="" databw="1024" />
+		<VM id="3" privateip="10.0.0.4" CPU="8" type="A4" comcap="76.8" price="0.506"/>
+		<VM id="4" privateip="10.0.0.5" CPU="8" type="A4" comcap="76.8" price="0.506"/>
+		<VM id="5" privateip="10.0.0.6" CPU="8" type="A4" comcap="76.8" price="0.506"/>		
+	</site>
+	<site region="Central US" id="2" publicIP="52.176.42.154" proBW="0.1117" CPU="24" role="slave">
+		<database name="montages" server="52.176.42.154" port="5432" username="liu" password="4vzkvdy9"/>
+		<connection target="0" thisport="8889" targetport="" databw="1024" />
+		<connection target="1" thisport="8890" targetport="" databw="1024" />
+		<connection target="2" thisport="0" targetport="" databw="0" />
+		<VM id="6" privateip="10.1.0.4" CPU="8" type="A4" comcap="76.8" price="0.5195"/>
+		<VM id="7" privateip="10.1.0.5" CPU="8" type="A4" comcap="76.8" price="0.5195"/>
+		<VM id="8" privateip="10.1.0.6" CPU="8" type="A4" comcap="76.8" price="0.5195"/>
+	</site>
+</multisite>

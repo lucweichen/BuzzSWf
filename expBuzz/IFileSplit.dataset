@@ -1,0 +1,4 @@
+BASEID;XMLBASE;DTD;STOPWORDS;SITE
+0;/home/lucliuji/buzz/input/dblp1.xml;/home/lucliuji/buzz/input/dblp.dtd;/home/lucliuji/buzz/input/english.stopwords.txt;0
+1;/home/lucliuji/buzz/input/dblp2.xml;/home/lucliuji/buzz/input/dblp.dtd;/home/lucliuji/buzz/input/english.stopwords.txt;1
+2;/home/lucliuji/buzz/input/dblp3.xml;/home/lucliuji/buzz/input/dblp.dtd;/home/lucliuji/buzz/input/english.stopwords.txt;2

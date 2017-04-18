@@ -1,0 +1,7 @@
+<Chiron>
+	<database name="chiron_2" server="193.49.108.97" port="5432" username="liu" password="4vzkvdy9"/>
+	<machine address="localhost" name="name" password="password" username="vitor" />
+	<Workflow execmodel="DYN_FTF" exectag="buzz-1" expdir="%=WFDIR%/exp" tag="buzz-sequential" wfdir="/home/luc/Desktop/buzz">
+			<Relation filename="IFileSplit.dataset" name="IFileSplit" />
+	</Workflow>
+</Chiron>

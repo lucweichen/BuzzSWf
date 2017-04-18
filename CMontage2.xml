@@ -1,0 +1,156 @@
+<?xml version="1.0" standalone="no"?>
+<Chiron>
+	<database name="montages" server="localhost" port="5432" username="liu" password="4vzkvdy9"/>
+	<Workflow tag="Montage2" description="Buzzword detection workflow">
+ 		<Activity tag="mProjectPP" description="reprojects a single image" type="MAP" 
+activation="mProjectPP %=MASS% %=IMASS% %=REGION% -X %=X%" extractor="echo 'BASE;OMASS;OMASSA' > ERelation.txt; echo '%=BASE%;%=IMASS%;%=IMASSA%' > ERelation.txt" workload="18.96">
+			<Relation reltype="Input" name="ImProjectPP"/>
+			<Relation reltype="Output" name="OmProjectPP"/>
+			<Field name="BASE" type="String" input="ImProjectPP" output="OmProjectPP"/>
+			<Field name="BASEID" type="float" input="ImProjectPP" output="OmProjectPP" decimalplaces="0"/>
+			<Field name="MASS" type="file" input="ImProjectPP" operation="COPY" />
+			<Field name="REGION" type="file" input="ImProjectPP" operation="COPY" output="OmProjectPP"/>
+			<Field name="IMASS" type="String" input="ImProjectPP"/>
+			<Field name="IMASSA" type="String" input="ImProjectPP"/>
+			<Field name="OMASS" type="file" output="OmProjectPP"/>
+			<Field name="OMASSA" type="file" output="OmProjectPP"/>
+			<Field name="X" type="float" input="ImProjectPP" decimalplaces="4"/>
+			<Field name="NAME" type="String" input="ImProjectPP" output="OmProjectPP"/>
+		</Activity>
+		<Activity tag="prepare" description="prepare data for mdiff" type="SPLIT_MAP"
+activation="cat %=BASE%/degree/2degree/statfile.tbl | grep fit | awk -F ' ' '{print $1,$2,$3}' | tr ' ' ';' | grep ';%=BASEID%;' > map;" extractor="echo 'BASEID;TBASE;FIT'>ERelation.txt; cat map > ERelation.txt;" workload="1.056">
+			<Relation reltype="Input" name="Iprepare" dependency="mProjectPP"/>
+			<Relation reltype="Output" name="Oprepare"/>
+			<Field name="BASE" type="String" input="Iprepare"/>
+			<Field name="BASEID" type="float" input="Iprepare" output="Oprepare" decimalplaces="0"/>
+			<Field name="OMASS" type="file" input="Iprepare" operation="COPY"/>
+			<Field name="OMASSA" type="file" input="Iprepare" operation="COPY"/>
+			<Field name="NAME" type="String" input="Iprepare"/>
+			<Field name="TBASE" type="float" output="Oprepare" decimalplaces="0" />
+			<Field name="FIT" type="String" output="Oprepare"/>
+		</Activity>
+		<Activity tag="generate" description="generate data for mdiff" type="MR_QUERY"
+activation="SELECT A.EWKFID, A.IK, A.base, A.baseid, A.region, A.omass, A.omassa, A.tbase, A.FIT, B.omass as omass1, B.omassa as omassa1 from (select M.EWKFID, M.IK, M.base, M.baseid, M.region, M.omass, M.omassa, P.tbase, P.FIT from Igeneratem as M, Igeneratep as P where M.baseid = P.baseid) as A, Igeneratem as B where A.tbase = B.baseid">
+			<Relation reltype="Input" name="Igeneratep" dependency="prepare"/>
+			<Relation reltype="Input" name="Igeneratem" dependency="mProjectPP"/>
+			<Relation reltype="Output" name="Ogenerate"/>
+			<Field name="BASE" type="String" input="Igeneratem" output="Ogenerate"/>
+			<Field name="BASEID" type="float" input="Igeneratem" decimalplaces="0" output="Ogenerate"/>
+			<Field name="REGION" type="file" input="Igeneratem" operation='COPY' output="Ogenerate"/>
+			<Field name="OMASS" type="file" input="Igeneratem" output="Ogenerate" operation="COPY"/>
+			<Field name="OMASSA" type="file" input="Igeneratem" output="Ogenerate" operation="COPY"/>
+			<Field name="BASEID" type="float" input="Igeneratep" decimalplaces="0"/>
+			<Field name="TBASE" type="float" input="Igeneratep" decimalplaces="0" output="Ogenerate"/>
+			<Field name="FIT" type="String" input="Igeneratep" output="Ogenerate"/>
+			<Field name="OMASS1" type="file" output="Ogenerate"/>
+			<Field name="OMASSA1" type="file" output="Ogenerate"/>
+		</Activity>
+		<Activity tag="mDiffFit" description="calculates a simple difference between a single pair of overlapping images" type="MAP" 
+activation="mDiffFit %=OMASS% %=OMASS1% diff.%=BASEID%.%=TBASE%.fits %=REGION% -s %=FIT%" extractor="echo 'FITTXT;DIFFFITS' > ERelation.txt; echo '%=FIT%;diff.%=BASEID%.%=TBASE%.fits' > ERelation.txt" workload="1.44">
+			<Relation reltype="Input" name="ImDiffFit" dependency="generate"/>
+			<Relation reltype="Output" name="OmDiffFit"/>
+			<Field name="BASE" type="String" input="ImDiffFit" output="OmDiffFit"/>
+			<Field name="BASEID" type="float" input="ImDiffFit" decimalplaces="0" output="OmDiffFit"/>
+			<Field name="REGION" type="file" operation='COPY' input="ImDiffFit"/>
+			<Field name="OMASS" type="file" operation='COPY' input="ImDiffFit"/>
+			<Field name="OMASSA" type="file" operation='COPY' input="ImDiffFit"/>
+			<Field name="TBASE" type="float" input="ImDiffFit" decimalplaces="0" output="OmDiffFit"/>
+			<Field name="FIT" type="String" input="ImDiffFit"/>
+			<Field name="OMASS1" type="file" input="ImDiffFit" operation='COPY'/>
+			<Field name="OMASSA1" type="file" input="ImDiffFit" operation='COPY'/>
+			<Field name="FITTXT" type="file" output="OmDiffFit"/>
+			<Field name="DIFFFITS" type="file" output="OmDiffFit"/>
+		</Activity>
+		<Activity tag="mConcatFit" description="Merge multiple plane fit parameter files (from mFitplane) into one file" type="REDUCE" operand="BASE"
+activation="mConcatFit %=BASE%/degree/2degree/statfile.tbl fits.tbl ./; echo 'BASE;FTBL' > ERelation.txt; echo '%=BASE%;fits.tbl' > ERelation.txt;" workload="5.184">
+			<Relation reltype="Input" name="ImConcatFit" dependency="mDiffFit"/>
+			<Relation reltype="Output" name="OmConcatFit"/>
+			<Field name="BASE" type="String" input="ImConcatFit" output="OmConcatFit"/>
+			<Field name="BASEID" type="float" input="ImConcatFit" decimalplaces="0"/>
+			<Field name="TBASE" type="float" input="ImConcatFit" decimalplaces="0"/>
+			<Field name="FITTXT" type="file" operation='COPY' input="ImConcatFit"/>
+			<Field name="FTBL" type="file" output="OmConcatFit"/>
+		</Activity>
+		<Activity tag="mBgModel" description="modelling/fitting program" type="MAP" activation="mBgModel -l -i 100000 %=BASE%/degree/2degree/pimages.tbl %=FTBL% corrections.tbl;" extractor="echo 'BASE;COR' > ERelation.txt; echo '%=BASE%;corrections.tbl' > ERelation.txt;" workload="70.464">
+			<Relation reltype="Input" name="ImBgModel" dependency="mConcatFit"/>
+			<Relation reltype="Output" name="OmBgModel"/>
+			<Field name="BASE" type="String" input="ImBgModel" output="OmBgModel"/>
+			<Field name="FTBL" type="file" operation='COPY' input="ImBgModel"/>
+			<Field name="COR" type="file" output="OmBgModel"/>
+		</Activity>
+		<Activity tag="BackPre" description="prepare data for mBackground" type="MR_QUERY"
+activation="SELECT P.EWKFID, P.IK, P.BASE, P.BASEID, P.OMASS, P.OMASSA, P.NAME, B.COR from Iproj as P, IBgM as B where P.BASE = B.BASE">
+			<Relation reltype="Input" name="Iproj" dependency="mProjectPP"/>
+			<Relation reltype="Input" name="IBgM" dependency="mBgModel"/>
+			<Relation reltype="Output" name="OBackPre"/>
+			<Field name="BASE" type="String" input="IBgM"/>
+			<Field name="BASE" type="String" input="Iproj" output="OBackPre"/>
+			<Field name="BASEID" type="float" input="Iproj" output="OBackPre" decimalplaces="0"/>
+			<Field name="OMASS" type="file" input="Iproj" operation='COPY' output="OBackPre"/>
+			<Field name="OMASSA" type="file" input="Iproj" operation='COPY' output="OBackPre"/>
+			<Field name="NAME" type="String" input="Iproj" output="OBackPre"/>
+			<Field name="COR" type="file" operation='COPY' input="IBgM" output="OBackPre"/>
+		</Activity>
+		<Activity tag="mBackground" description="Remove a background plane from a FITS image" type="MAP" activation="mBackground -t p%=NAME%.fits c%=NAME%.fits %=BASE%/degree/2degree/pimages.tbl %=COR%" extractor="echo 'CMASS;CMASSA' > ERelation.txt; echo 'c%=NAME%.fits;c%=NAME%_area.fits' > ERelation.txt;" workload="1.152">
+			<Relation reltype="Input" name="ImBackground" dependency="BackPre"/>
+			<Relation reltype="Output" name="OmBackground"/>
+			<Field name="BASE" type="String" input="ImBackground" output="OmBackground"/>
+			<Field name="BASEID" type="float" input="ImBackground" output="OmBackground" decimalplaces="0"/>
+			<Field name="OMASS" type="file" input="ImBackground" operation='COPY' />
+			<Field name="OMASSA" type="file" input="ImBackground" operation='COPY' />
+			<Field name="CMASS" type="file" output="OmBackground"/>
+			<Field name="CMASSA" type="file" output="OmBackground"/>
+			<Field name="NAME" type="String" input="ImBackground"/>
+			<Field name="COR" type="file" operation='COPY' input="ImBackground" />
+		</Activity>
+		<Activity tag="mImgtbl" description="extracts the FITS header geometry information" type="REDUCE" operand="BASE"
+activation="mImgtbl ./ -t %=BASE%/degree/2degree/cimages.tbl nim.tbl; echo 'BASE;FTBL' > ERelation.txt; echo '%=BASE%;nim.tbl' > ERelation.txt;" workload="0.8736">
+			<Relation reltype="Input" name="ImImgtbl" dependency="mBackground"/>
+			<Relation reltype="Output" name="OmImgtbl"/>
+			<Field name="BASE" type="String" input="ImImgtbl" output="OmImgtbl"/>
+			<Field name="BASEID" type="float" input="ImImgtbl" decimalplaces="0"/>
+			<Field name="CMASS" type="file" input="ImImgtbl" operation='COPY'/>
+			<Field name="CMASSA" type="file" input="ImImgtbl" operation='COPY'/>
+			<Field name="FTBL" type="file" output="OmImgtbl"/>
+		</Activity>
+		<Activity tag="mAddPre" description="prepare data for mAdd" type="MR_QUERY"
+activation="SELECT B.EWKFID, B.IK, B.BASE, B.BASEID, B.CMASS, B.CMASSA, I.FTBL from ImAddB as B, ImAddI as I where B.BASE = I.BASE">
+			<Relation reltype="Input" name="ImAddB" dependency="mBackground"/>
+			<Relation reltype="Input" name="ImAddI" dependency="mImgtbl"/>
+			<Relation reltype="Output" name="OmAddPre"/>
+			<Field name="BASE" type="String" input="ImAddB" output="OmAddPre"/>
+			<Field name="BASEID" type="float" input="ImAddB" decimalplaces="0" output="OmAddPre"/>
+			<Field name="CMASS" type="file" input="ImAddB" operation='COPY' output="OmAddPre"/>
+			<Field name="CMASSA" type="file" input="ImAddB" operation='COPY' output="OmAddPre"/>
+			<Field name="BASE" type="String" input="ImAddI"/>
+			<Field name="FTBL" type="file" input="ImAddI" output="OmAddPre"/>
+		</Activity>
+		<Activity tag="mAdd" description="Coadd the reprojected images in an input list to form an output mosaic" type="REDUCE" operand="BASE"
+activation="mAdd -e %=FTBL% %=BASE%/degree/2degree/region.hdr mosaic.fits; echo 'BASE;MOS' > ERelation.txt; echo '%=BASE%;mosaic.fits' > ERelation.txt;" workload="10.032">
+			<Relation reltype="Input" name="ImAdd" dependency="mAddPre"/>
+			<Relation reltype="Output" name="OmAdd"/>
+			<Field name="BASE" type="String" input="ImAdd" output="OmAdd"/>
+			<Field name="BASEID" type="float" input="ImAdd" decimalplaces="0" />
+			<Field name="CMASS" type="file" input="ImAdd" operation='COPY' />
+			<Field name="CMASSA" type="file" input="ImAdd" operation='COPY' />
+			<Field name="FTBL" type="file" input="ImAdd" operation='COPY'/>
+			<Field name="MOS" type="file" output="OmAdd"/>
+		</Activity>
+		<Activity tag="mShrink" description="A utility for reducing the size of a FITS file, by averaging blocks of pixels." type="MAP"
+activation="mShrink %=MOS% shr.fits 2" extractor="echo 'BASE;SHR' > ERelation.txt; echo '%=BASE%;shr.fits' > ERelation.txt;" workload="4.5024">
+			<Relation reltype="Input" name="ImShrink" dependency="mAdd"/>
+			<Relation reltype="Output" name="OmShrink"/>
+			<Field name="BASE" type="String" input="ImShrink" output="OmShrink"/>
+			<Field name="MOS" type="file" input="ImShrink" operation='COPY'/>
+			<Field name="SHR" type="file" output="OmShrink"/>
+		</Activity>
+		<Activity tag="mJPEG" description="Generates a JPEG image file from a FITS file" type="MAP"
+activation="mJPEG -ct 1 -gray %=SHR% -1.5s 60s gaussian -out out.jpg;" extractor="echo 'BASE;OUT' > ERelation.txt; echo '%=BASE%;out.jpg' > ERelation.txt;" workload="8.8512">
+			<Relation reltype="Input" name="ImJPEG" dependency="mShrink"/>
+			<Relation reltype="Output" name="OmJPEG"/>
+			<Field name="BASE" type="String" input="ImJPEG" output="OmJPEG"/>
+			<Field name="SHR" type="file" input="ImJPEG" operation='COPY'/>
+			<Field name="OUT" type="file" output="OmJPEG"/>
+		</Activity>
+	</Workflow>
+</Chiron>

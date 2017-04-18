@@ -1,0 +1,147 @@
+<?xml version="1.0" standalone="no"?>
+<Chiron>
+	<database name="testdb" server="40.118.111.249" port="5432" username="liu" password="4vzkvdy9"/>
+	<Workflow tag="buzz-sequential" description="Buzzword detection workflow">
+	        <Activity tag="FileSplit" description="Splits DBLP XML" type="SPLIT_MAP"
+activation="java -jar -Xmx1g -DentityExpansionLimit=1900000 /home/lucliuji/buzz/bin/XmlSplit.jar %=XMLBASE% 200" extractor="java -jar /home/lucliuji/buzz/bin/SplitExtractor.jar /home/lucliuji/buzz/exp/FileSplit/%=BASEID%; java -jar /home/lucliuji/buzz/bin/FileSplitExtractor-1.0.jar 1606 5172 5174 602; for f in publication*.xml; do mv $f %=SITE%$f; done; sed -i -- 's/publications/%=SITE%publications/g;' ERelation.txt;" workload="12,676">
+			<Relation reltype="Input" name="IFileSplit"/>
+			<Relation reltype="Output" name="OFileSplit"/>
+			<Field name="BASEID" type="float" input="IFileSplit" output="OFileSplit" decimalplaces="0"/>
+			<Field name="XMLBASE" type="file" input="IFileSplit" operation="COPY" />
+			<Field name="DTD" type="file" input="IFileSplit" operation="COPY" />
+			<Field name="STOPWORDS" type="file" input="IFileSplit" output="OFileSplit" operation="COPY"/>
+			<Field name="SITE" type="float" input="IFileSplit" decimalplaces="0"/>
+			<Field name="FILEID" type="float" output="OFileSplit" decimalplaces="0"/>
+			<Field name="FILE" type="file" output="OFileSplit" operation="COPY"/>
+		</Activity>
+		<Activity tag="Buzz" description="Buzz XML files counting words" type="SPLIT_MAP"
+activation="java -jar /home/lucliuji/buzz/bin/Buzz.jar %=FILE%; mv H_Relation.txt ERelation.txt" workload="4.48">
+			<Relation reltype="Input" name="IBuzz" dependency="FileSplit"/>
+			<Relation reltype="Output" name="OBuzz"/>
+			<Field name="BASEID" type="float" input="IBuzz" output="OBuzz" decimalplaces="0"/>
+			<Field name="STOPWORDS" type="file" input="IBuzz" operation="COPY"/>
+			<Field name="FILEID" type="float" input="IBuzz" output="OBuzz" decimalplaces="0"/>
+			<Field name="FILE" type="file" input="IBuzz" operation="COPY"/>
+			<Field name="YEAR" type="float" output="OBuzz" decimalplaces="0"/>
+			<Field name="WORD" type="string" output="OBuzz" />
+			<Field name="COUNT" type="float" output="OBuzz" decimalplaces="0"/>
+		</Activity>
+		<Activity tag="WordReduce" description="Sumarizes the word counts for each year" type="SR_QUERY"
+activation="SELECT MIN(EWKFID) as EWKFID, MIN(%=KEY%) as %=KEY%, YEAR, WORD, SUM(COUNT) as COUNT FROM IReduce WHERE ewkfid=%=EWKFID% GROUP BY WORD, YEAR ORDER BY WORD">
+			<Relation reltype="Input" name="IReduce" dependency="Buzz"/>
+			<Relation reltype="Output" name="OReduce"/>
+			<Field name="BASEID" type="float" input="IReduce" decimalplaces="0"/>
+			<Field name="FILEID" type="float" input="IReduce" decimalplaces="0"/>
+			<Field name="YEAR" type="float" input="IReduce" output="OReduce" decimalplaces="0"/>
+			<Field name="WORD" type="string" input="IReduce" output="OReduce" />
+			<Field name="COUNT" type="float" input="IReduce" output="OReduce" decimalplaces="0"/>
+		</Activity>
+		<Activity tag="YearFilter" description="Removes unwanted years" type="SR_QUERY"
+activation="SELECT EWKFID, %=KEY%, WORD, YEAR as NUYEAR, COUNT as WORDCOUNT FROM IFilter WHERE YEAR > 1991 AND YEAR &lt; 2013 AND WORD NOT LIKE '-' AND WORD NOT LIKE '' ORDER BY WORD">
+			<Relation reltype="Input" name="IFilter" dependency="WordReduce"/>
+			<Relation reltype="Output" name="OFilter"/>
+			<Field name="YEAR" type="float" input="IFilter" decimalplaces="0"/>
+			<Field name="WORD" type="string" input="IFilter" output="OFilter" />
+			<Field name="COUNT" type="float" input="IFilter" decimalplaces="0"/>
+			<Field name="NUYEAR" type="float" output="OFilter" decimalplaces="0"/>
+			<Field name="WORDCOUNT" type="float" output="OFilter" decimalplaces="0"/>
+		</Activity>	
+		<Activity tag="BuzzHistory" description="Creates the History File" type="REDUCE" operand="WORD"
+activation="java -jar /home/lucliuji/buzz/bin/BuzzHistory.jar history-%=WORD%.txt %=WORD% ihistory.hfrag; mv H_Relation.txt ERelation.txt" workload="1.536">
+			<Relation reltype="Input" name="IHistory" dependency="YearFilter"/>
+			<Relation reltype="Output" name="OHistory"/>
+			<Field name="WORD" type="string" input="IHistory" output="OHistory" />	
+			<Field name="NUYEAR" type="float" input="IHistory" decimalplaces="0"/>
+			<Field name="WORDCOUNT" type="float" input="IHistory" decimalplaces="0"/>
+			<Field name="MAXHIT" type="float" output="OHistory" decimalplaces="0"/>
+			<Field name="HISTORY" type="file" output="OHistory" operation="COPY"/>
+		</Activity>
+		<Activity tag="SORT" description="Sort WORDS by the maxhit descending" type="SR_QUERY"
+activation="SELECT EWKFID, %=KEY%, WORD, MAXHIT, HISTORY FROM ISort WHERE EWKFID=%=EWKFID% ORDER BY MAXHIT DESC">
+			<Relation reltype="Input" name="ISort" dependency="BuzzHistory"/>
+			<Relation reltype="Output" name="OSort"/>
+			<Field name="WORD" type="string" input="ISort" output="OSort" />	
+			<Field name="MAXHIT" type="float" input="ISort" output="OSort" decimalplaces="0"/>
+			<Field name="HISTORY" type="file" input="ISort" output="OSort" operation="COPY"/>
+		</Activity>
+		<Activity tag="Top10" description="Gets the top 10 words from BuzzHistory for a given year" type="MR_QUERY" 
+activation="SELECT B.EWKFID as EWKFID, B.IK as IK, B.WORD as TOPWORD, B.HISTORY as TOPHISTORY FROM ITop10 B, IYear Y WHERE Y.NUYEAR=2012 AND B.WORD=Y.WORD AND B.EWKFID=%=EWKFID% AND Y.EWKFID=%=EWKFID% ORDER BY B.MAXHIT DESC LIMIT 10">
+			<Relation reltype="Input" name="ITop10" dependency="BuzzHistory"/>
+			<Relation reltype="Input" name="IYear" dependency="YearFilter"/>
+			<Relation reltype="Output" name="OTop10" />
+			<Field name="WORD" type="string" input="IYear" />
+			<Field name="NUYEAR" type="float" input="IYear" />
+			<Field name="WORDCOUNT" type="float" input="IYear" />
+			<Field name="WORD" type="string" input="ITop10" />
+			<Field name="MAXHIT" type="float" input="ITop10" decimalplaces="0"/>
+			<Field name="HISTORY" type="file" input="ITop10" operation="COPY"/>
+			<Field name="TOPWORD" type="string" output="OTop10"/>
+			<Field name="TOPHISTORY" type="file" output="OTop10" operation="COPY"/>
+		</Activity>
+		<Activity tag="HistogramCreator" description="Creates the Histograms File" type="Map"
+activation="java -jar /home/lucliuji/buzz/bin/HistogramMaker.jar %=WORD% %=HISTORY% histogram-%=WORD%.png; mv H_Relation.txt ERelation.txt" extractor="java -jar /home/lucliuji/buzz/bin/FileSplitExtractor-1.0.jar 13379" workload="8.52">
+			<Relation reltype="Input" name="IHist" dependency="SORT"/>
+			<Relation reltype="Output" name="OHist"/>
+			<Field name="WORD" type="string" input="IHist" output="OHist" />	
+			<Field name="MAXHIT" type="float" input="IHist" output="OHist" decimalplaces="0"/>
+			<Field name="HISTORY" type="file" input="IHist" output="OHist" operation="COPY"/>
+			<Field name="PICNAME" type="file" output="OHist" operation="COPY"/>
+		</Activity>
+		<Activity tag="ZipfFilter" description="Filter the results acoording to Zipf's law" type="SR_QUERY"
+activation="SELECT EWKFID, %=KEY%, WORD, MAXHIT, HISTORY, PICNAME FROM IZipf WHERE MAXHIT &gt; 3324 AND MAXHIT &lt; 14517 AND EWKFID=%=EWKFID%">
+			<Relation reltype="Input" name="IZipf" dependency="HistogramCreator"/>
+			<Relation reltype="Output" name="OZipf"/>
+			<Field name="WORD" type="string" input="IZipf" output="OZipf" />	
+			<Field name="MAXHIT" type="float" input="IZipf" output="OZipf" decimalplaces="0"/>
+			<Field name="HISTORY" type="file" input="IZipf" output="OZipf" operation="COPY"/>			
+			<Field name="PICNAME" type="file" input="IZipf" output="OZipf" operation="COPY"/>
+		</Activity>
+		<Activity tag="CrossJoin" description="Cross joins Top words with possible buzzwords" type="MR_QUERY" 
+activation="SELECT T.EWKFID, T.IK, T.TOPWORD, T.TOPHISTORY, Z.WORD, Z.HISTORY FROM (SELECT EWKFID, IK, TOPWORD, TOPHISTORY FROM ICrossJoin WHERE EWKFID=%=EWKFID%) AS T CROSS JOIN (SELECT WORD, HISTORY FROM IZrossJoin WHERE EWKFID=%=EWKFID%) AS Z" >
+			<Relation reltype="Input" name="ICrossJoin" dependency="Top10"/>
+			<Relation reltype="Input" name="IZrossJoin" dependency="ZipfFilter"/>
+			<Relation reltype="Output" name="OCrossJoin" />
+			<Field name="TOPWORD" type="string" input="ICrossJoin" output="OCrossJoin" />
+			<Field name="TOPHISTORY" type="file" input="ICrossJoin" output="OCrossJoin" operation="COPY"/>
+			<Field name="WORD" type="string" input="IZrossJoin" output="OCrossJoin"/>
+			<Field name="MAXHIT" type="file" input="IZrossJoin" operation="COPY"/>
+			<Field name="HISTORY" type="string" input="IZrossJoin" output="OCrossJoin"/>
+			<Field name="PICNAME" type="file" input="IZrossJoin" operation="COPY"/>
+		</Activity>
+		<Activity tag="Correlate" description="Calculates the correlation between two histories" type="MAP"
+activation="java -jar /home/lucliuji/buzz/bin/Correlate.jar %=TOPHISTORY% %=HISTORY%; mv H_Relation.txt ERelation.txt" workload="1.5">
+			<Relation reltype="Input" name="ICorrelate" dependency="CrossJoin"/>
+			<Relation reltype="Output" name="OCorrelate"/>
+			<Field name="TOPWORD" type="string" input="ICorrelate" output="OCorrelate" />
+			<Field name="TOPHISTORY" type="file" input="ICorrelate" output="OCorrelate" operation="COPY"/>
+			<Field name="WORD" type="string" input="ICorrelate" output="OCorrelate" />
+			<Field name="HISTORY" type="file" input="ICorrelate" output="OCorrelate" operation="COPY"/>
+			<Field name="CORRELATION" type="float" output="OCorrelate" decimalplaces="4"/>
+		</Activity>
+		<Activity tag="TopC" description="Selects the most correlated terms" type="SR_QUERY"
+activation="SELECT EWKFID, %=KEY%, TOPWORD, WORD, CORRELATION FROM ITop WHERE CORRELATION > 0.85 AND EWKFID=%=EWKFID% ORDER BY WORD ASC, CORRELATION DESC">
+			<Relation reltype="Input" name="ITop" dependency="Correlate"/>
+			<Relation reltype="Output" name="OTop" />
+			<Field name="TOPWORD" type="string" input="ITop" output="OTop" />
+			<Field name="TOPHISTORY" type="file" input="ITop" operation="COPY"/>
+			<Field name="WORD" type="string" input="ITop" output="OTop" />
+			<Field name="HISTORY" type="file" input="ITop" operation="COPY"/>
+			<Field name="CORRELATION" type="float" input="ITop" output="OTop" decimalplaces="4"/>
+		</Activity>
+		<Activity tag="GatherResults" description="Selects the histograms for these pairs" type="MR_QUERY" 
+activation="SELECT T.EWKFID, T.IK, T.TOPWORD, T.WORD, Z.PICNAME as TOPPIC, Y.PICNAME as PIC FROM (SELECT EWKFID, IK, TOPWORD, WORD FROM ITopC WHERE EWKFID=%=EWKFID%) as T, IZipFilter as Z, IZipFilter as Y WHERE Z.EWKFID=%=EWKFID% and Y.EWKFID=%=EWKFID% and T.TOPWORD=Z.WORD and T.WORD=Y.WORD" >
+			<Relation reltype="Input" name="ITopC" dependency="TopC"/>
+			<Relation reltype="Input" name="IZipFilter" dependency="ZipfFilter"/>
+			<Relation reltype="Output" name="OGatherResults" />
+			<Field name="TOPWORD" type="string" input="ITopC" output="OGatherResults"/>
+			<Field name="WORD" type="string" input="ITopC" output="OGatherResults"/>
+			<Field name="CORRELATION" type="float" input="ITopC"/>
+			<Field name="WORD" type="string" input="IZipFilter"/>
+			<Field name="MAXHIT" type="float" input="IZipFilter" decimalplaces="0"/>
+			<Field name="HISTORY" type="file" input="IZipFilter" operation="COPY"/>
+			<Field name="PICNAME" type="file" input="IZipFilter" operation="COPY"/>
+			<Field name="TOPPIC" type="file" output="OGatherResults" operation="COPY"/>
+			<Field name="PIC" type="file" output="OGatherResults" operation="COPY"/>
+		</Activity>
+	</Workflow>
+</Chiron>
